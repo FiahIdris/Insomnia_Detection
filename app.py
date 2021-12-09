@@ -1,17 +1,7 @@
 import streamlit as st
 import pandas as pd
-import joblib
-import plotly.express as px
-import numpy as np
-import altair as alt
 import seaborn as sns
 import matplotlib.pyplot as plt
-# Machine Learning model
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.base import TransformerMixin
 # Deployment purposes
 import joblib
 from custom_transformer import NewColumnTransform
@@ -48,7 +38,7 @@ df = load_data()
 
 def homepage_screen():
 
-    st.title('BANK TERM DEPOSIT CAMPAIGN')
+    st.title('INSOMNIA DETECTION')
     st.header("Dataset Information")
     st.write("""  
         **About Dataset**  
