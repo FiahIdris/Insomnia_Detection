@@ -27,7 +27,7 @@ def main():
         model_predict()
 
 
-@st.cache()
+@st.cache_data()
 def load_data():
     data = pd.read_csv('clean_data.csv', delimiter=",")
     return data
