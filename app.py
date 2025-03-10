@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 # Deployment purposes
 import joblib
 from custom_transformer import NewColumnTransform
@@ -15,15 +16,15 @@ model = joblib.load("my_model.pkl")
 
 def main():
     page = st.sidebar.selectbox(
-        "Select a page", ["Homepage", "Exploration", "Prediction"])
+        "Select a page", ["Dashboard", "Exploration","Model Accuracy", "Model Prediction"])
 
-    if page == "Homepage":
+    if page == "Dashboard":
         homepage_screen()
     elif page == "Exploration":
         exploration_screen()
-    # elif page == "Model":
-    #     model_screen()
-    elif page == "Prediction":
+    elif page == "Model Accuracy":
+        model_screen()
+    elif page == "Model Prediction":
         model_predict()
 
 
@@ -38,108 +39,204 @@ df = load_data()
 
 def homepage_screen():
 
-    st.title('INSOMNIA DETECTION')
-    st.header("Dataset Information")
-    st.write("""  
-        **About Dataset**  
+    color = "#e44652"
+    text = "Simple Data Dashboard"
+    st.markdown(f"<h1 style='color:{color};'>{text}</h1>", unsafe_allow_html=True)
 
-            id - person's identificator  
-            age - person's age in years  
-            weight- person's weight in kilograms  
-            height- person's height in centimeters  
-            sex - person's sex  
-            stress - level of stress during last month (1, 2, 3 - higher values correspond to larger stress)  
-            doctor - relative number of visits to doctor previously (1, 2, 3 - higher values correspond to greater number of visits)  
-            sport - is person physically active or not (binary)  
-            pernicious_1 - does person have some bad habit or not (binary)  
-            pernicious_2 - does person have some another bad habit or not (binary)  
-            ubp/lbp - upper/lower blood pressure in mmHg  
-            insomnia - target, does person have sleep disorder or not (binary)    
-        
-        The dataset constains of 70000 instances and 13 columns. More information of the dataset can be accessed [here]("https://www.kaggle.com/c/idao-2022-bootcamp-insomnia").
-        
-    """)
+    # st.divider()
+    st.markdown("The dataset used in this project is utilized to build a machine learning model that predicts a person's insomnia disease based on the provided health and condition information. The dataset consists of 70,000 samples from different individuals' health records. Each record contains 11 different pieces of information along with their insomnia report. More details about the dataset can be accessed [here]('https://www.kaggle.com/c/idao-2022-bootcamp-insomnia').")
+    st.subheader('Column Description',divider=True)
 
-    if st.checkbox('See dataset'):
+    st.markdown("""
+                ```
+                1.  code         : person's identificator 
+                2.  age          : person's age in years
+                3.  weight       : person's weight in kilograms
+                4.  height       : person's height in centimeters 
+                5.  sex          : person's sex
+                6.  stress       : level of stress during last month (1, 2, 3 - higher values correspond to larger stress)
+                7.  doctor       : relative number of visits to doctor previously (1, 2, 3 - higher values correspond to greater number of visits)
+                8.  sport        : is person physically active or not (binary)
+                9.  pernicious_1 : does person have some bad habit or not (binary)
+                10. pernicious_2 : does person have some another bad habit or not (binary)
+                11. ubp/lbp      : upper/lower blood pressure in mmHg 
+                12. insomnia     : target, does person have sleep disorder or not (binary)
+                ```
+                """)  
+            #    
+            #   
+            #   
+            #   
+            #  
+            # insomnia - target, does person have sleep disorder or not (binary)  
+    
+    if st.checkbox('Show Data Preview'):
         # Load data
         data_load_state = st.text('Loading data...')
-        df = load_data()
-        st.write(df)
+        st.write(df.head())
         data_load_state.text('')
+        # st.bar_chart(df)
+        # st.line_chart(df)
+
+    st.subheader('Data Summary',divider=True)
+    data_summary = df.describe().T
+    type = df.dtypes.reset_index()
+    type= type.rename(columns={0:'type'})
+    uniques= df.nunique().reset_index()
+    uniques = uniques.rename(columns = {0:'count_unique'})
+    data = data_summary.merge(type,left_index=True,right_on='index')
+    data = pd.merge(data,uniques,on='index')
+    data =data.rename(columns={'index':'column'}).set_index('column')
+    st.write(data)
+    
+
+    
+    st.subheader('Filter Data',divider=True)
+  
+    columns = df.columns.tolist()
+    
+    col1, col2 = st.columns(2)
+
+    selected_column = col1.selectbox('Select column to filter by', columns)
+    unique_values = df[selected_column].unique()
+    
+    selected_value = col1.selectbox('Select value', unique_values)
+    filtered_data = df[df[selected_column] == selected_value]
+    filtered_data = filtered_data.reset_index(drop=True)
+    st.write(filtered_data)
+    
+    count_value = filtered_data.shape[0]
+    count_percentage =f"{round(count_value / (df.shape[0])*100,2)}%"
+    col2.metric('Count Row',count_value,count_percentage,border=True)
+
 
 
 def exploration_screen():
-    st.title("Data Exploration")
+    color = "#e44652"
+    text = "Data Exploration"
+    st.markdown(f"<h1 style='color:{color};'>{text}</h1>", unsafe_allow_html=True)
+
     st.write(""" 
         This page contains general exploratory data analysis in order to get basic insight of the dataset information and get the feeling about what this dataset is about.
     """)
 
-    st.write("""
-        ## 📌 Correlational Matrix  
-        
-    """)
-    # Matrix correlation.
-    fig, ax = plt.subplots()
-    corr_df = df[['age', 'sex', 'stress', 'doctor', 'ubp', 'lbp',
-                 'insomnia']]
-    plt.figure(figsize=[10, 1])
-    sns.heatmap(corr_df.corr(), annot=True, cmap='RdYlGn', ax=ax)
-    # plt.style.available
-    plt.title('Correlation Among Features')
+    st.subheader("Correlational Matrix",divider=True)
+    st.write('This figure shows the correlation among features')
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.patch.set_alpha(0)
+    ax.set_facecolor("none") 
+    corr_df = df[['age', 'sex', 'stress', 'doctor', 'ubp', 'lbp','insomnia']]
+    corr = df.corr()
+    mask = np.triu(corr)
+    sns.heatmap(corr, annot=True, fmt=".2f", ax=ax, mask=mask)
     st.write(fig)
+    
+    st.markdown("""
+                From the figure above we got some insight related to the features which have high correlation such as :
+        - blood pressure and insomnia = 0.31 for lbp and 0.42 for ubp
+        - doctor and stress = 0.46
+        - sex and height = 0.52
+        - weight and height = 0.31
+        """)
+    
+    st.subheader("Blood_pressure and Insomnia",divider=True)
+    st.write("This scatterplot diagram shows how person's blood pressure: ubp (upper blood pressure) and lbp (lower blood pressure), bring the high contribution to give an insomnia disease.")
+    fig, ax = plt.subplots(figsize=(8, 4))
+    fig.patch.set_alpha(0)
+    ax.set_facecolor("none")
+    sns.scatterplot(data=df, x='lbp', y='ubp', hue='insomnia', ax=ax,palette=['#e44652', '#e2c178'] )
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    st.pyplot(fig)
+    st.markdown("""
+                Some points derived based on the diagram above:
+                - lbp and ubp have positive correlation.
+                - If the upper blood pressure increase, it will be followed by the increasing of lower blood pressure aswell.
+                - The people with high blood pressure most likely will have insomnia problem. And the most influencing factor is the upper blood pressure because even the people with low lbp but high ubp they still tends to have insomia.
+                """)
 
-    st.write("""
-        ## 📌  Features Correlation Value toward Target Column
-        
-    """)
-    # Display correlation towards target column
-    fig, axs = plt.subplots(figsize=(10, 4))
-    corr = df.corr()['insomnia'].reset_index()
-    # corr.drop( axis=0, inplace=True)
-    sns.barplot(data=corr, x='index', y='insomnia', ax=axs)
-    plt.xticks(rotation=70)
-    st.write(fig)
 
-    st.write("""
-        ## 📌 Target Label Frequency  
-        
-    """)
-
-    fig, axs = plt.subplots(ncols=2, figsize=(10, 4))
-    df['insomnia'].value_counts().plot(kind='bar', ax=axs[0])
-    df['insomnia'].value_counts().plot.pie(
-        autopct='%1.1f%%', startangle=90, ax=axs[1], colors=['green', 'teal'])
-    st.write(fig)
-
-    st.write("""
-        ## 📌  Blood_pressure and Insomnia
-        
-    """)
-    fig, axs = plt.subplots()
-    sns.scatterplot(data=df, x='lbp', y='ubp', hue='insomnia', ax=axs)
-    st.write(fig)
-
-    st.write("""
-        ## 📌 Gender and Height Relation.
-        
-    """)
-    fig, axs = plt.subplots(ncols=2, figsize=(10, 4))
-    sns.scatterplot(data=df, x='height', y='weight', hue='sex', ax=axs[0])
-    sns.kdeplot(data=df, x='height', hue='sex', ax=axs[1])
+    st.subheader("Doctor and Stress Relation", divider=True)
+    st.write("According to the correlation matrix showed above, there are high correlation between these two features: doctor and stress with 0.46.")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.patch.set_alpha(0)
+    ax.set_facecolor("none")
+    sns.countplot(data=df, x='doctor', hue='stress', ax=ax, palette=['#F8894F','#AE1726','#006837'])
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    st.pyplot(fig)
+    st.markdown("""
+                - Most people on the first and second level of stress visit doctor once only.
+                - People who visit doctor 3 times are those whose stress level is at level 3 followed by the people with stress level at 1 and only few people with stress level 2 come to see doctor 3 times.
+                - It can be concluded that people who has stress problem still rarely visit the doctor.
+                """)
+    
+    
+    st.subheader("Gender and Height Relation",divider=True)
+    st.write("From this dataset, we can find that generally male is taller than female when the shorter male is 10 cm higher than the shortest female: the height of average female is around 165 cm when the male is around 170 cm. It seem's like the taller a person is the heavier he is.")
+    fig, axs = plt.subplots(ncols=2, figsize=(8, 4))
+    fig.patch.set_alpha(0)
+    for ax in axs:
+        ax.set_facecolor("none") 
+    sns.scatterplot(data=df, x='height', y='weight', hue='sex', ax=axs[0],palette=['#2d1e3e','#e44652'])
+    sns.kdeplot(data=df, x='height', hue='sex', ax=axs[1],palette=['#2d1e3e','#e44652'])
     plt.show()
     st.write(fig)
+    
+    st.divider()
+    
+    st.html("<h3>Now, let's count the total rows and have a look proportion of dataset based on column insomnia as the target value</h3>")
 
-    st.write("""
-        ## 📌  Doctor and Stress Relation
-        
-    """)
-    fig, axs = plt.subplots()
-    sns.countplot(data=df, x='doctor', hue='stress', ax=axs)
-    st.write(fig)
+
+    # Create two columns
+    col1, col2 = st.columns(2)  # col1 (wider for chart), col2 (narrower for text)
+
+    # Create figure
+    fig, axs = plt.subplots(figsize=(7, 5))
+    fig.patch.set_alpha(0)  # Remove figure background
+    axs.set_facecolor("none")  # Remove plot background
+
+    # Bar chart with custom colors
+    df['insomnia'].value_counts().plot(kind='bar', ax=axs, color=['#e44652', '#f06640'])
+
+    # Display the chart in col1
+    col1.pyplot(fig)
+
+    # Create an empty container in col2 to center text vertically
+    with col2:
+        st.write("")  
+        st.write("")  
+        st.write("")  
+        st.write("")  
+        st.write("The total row for the people who got insomnia and who did not is almost the same.")
+        st.write("") 
+
+    
+    
+    col1, col2 = st.columns(2)
+    fig, axs = plt.subplots(figsize=(6,6))
+    fig.patch.set_alpha(0)
+    axs.set_facecolor("none") 
+    df['insomnia'].value_counts().plot.pie(autopct='%1.1f%%', startangle=90, ax=axs, colors=['#e44652', '#f06640'])
+    with col1:
+        st.write("")  
+        st.write("")  
+        st.write("")  
+        st.write("")  
+        st.write("")  
+        st.write("")  
+        st.write("There are 51 % data of people with have no insomnia problems and 49 % people have insomnia. This is indicate that this dataset classified as fair dataset.")
+        st.write("")  
+    col2.write(fig)
+
+    
 
 
 def model_screen():
-    st.title("Model")
+    st.subheader("Machine Learning Model")
+    st.write("There are several machine learning models used to train the dataset in this project. We compare accuracy of each model and choose the highest accuracy among them to use in the prediction model.")
     st.write(""" 
              
              """)
@@ -208,47 +305,53 @@ def model_screen():
 
 
 def validation(matrix, cross_score, prec_score, rec_score, f1, acc_score_train, acc_score_test):
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6,4))
+    fig.patch.set_alpha(0)
+    ax.set_facecolor("none")
     sns.heatmap(matrix, annot=True, cmap="YlGnBu", fmt='g', ax=ax)
     ax.set_xlabel('PREDICTED')
     ax.set_ylabel('ACTUAL')
     ax.set_title('Confusion Matrix')
     st.write(fig)
     st.write(f"""
-    👉 Cross Validation  mean: {cross_score}   
-    👉 Precision : {prec_score}  
-    👉 Recall : {rec_score}  
-    👉 F1 : {f1}  
-
-    👉 Training Accuracy : {acc_score_train}  
-    👉 Validation Accuracy : {acc_score_test}  
+    - Cross Validation  mean: {cross_score}   
+    - Precision : {prec_score}  
+    - Recall : {rec_score}  
+    - F1 : {f1}  
+    - Training Accuracy : {acc_score_train}  
+    - Validation Accuracy : {acc_score_test}  
              """)
 
 
 def model_predict():
 
-    st.title("Prediction")
-    st.write("### Field this form to predict the posibility of getting insomnia !")
+    st.subheader("Prediction")
+    st.html("<h4r>This is the final model to use for predicting person's insomnia disease based on the given features.</h4r>")
+    st.html("<p>Field this form to predict the posibility of getting insomnia !</p>")
     # pernicious_1 = list(df.age.unique())
     # pernicious_2 = list(df.age.unique())
     # sport_value = list(df.education.unique())
     # doctor_value = list(df.default.unique())
     # stress_value = list(df.month.unique())
-    age = st.number_input(label="Age", min_value=30,
+    col1,col2,col3 = st.columns(3)
+    age = col1.number_input(label="Age", min_value=20,
                           max_value=100, step=1,)
-    weight = st.slider(
+    col1,col2,col3 = st.columns(3)
+    weight = col1.slider(
         "Weight", 20, 150)
-    height = st.slider(
+    height = col3.slider(
         "Height", 20, 250)
     stress = st.radio("Stress Level", ['1', '2', '3', '4'])
-    doctor = st.radio("How many times visited doctor", ['1', '2', '3'])
+    doctor = st.radio("How many times consulting to a doctor", ['1', '2', '3'])
     sport = st.radio("Active in sport", ['yes', 'no'])
-    pernicious_1 = st.selectbox(
+    col1,col3 = st.columns(2)
+    pernicious_1 = col1.selectbox(
         "Do you have bad habit?", ['yes', 'no'])
-    pernicious_2 = st.selectbox(
-        "Do you have other bad habit?", ['yes', 'no'])
-    ubp = st.slider("Upper blood pressure", 50, 200)
-    lbp = st.slider("Lower blood pressure", 50, 200)
+    pernicious_2 = col3.selectbox(
+        "Other bad habit?", ['yes', 'no'])
+    col1,col2,col3 = st.columns(3)
+    ubp = col1.slider("Upper blood pressure", 50, 200)
+    lbp = col3.slider("Lower blood pressure", 50, 200)
     submit_button = st.button("Predict")
 
     if sport == 'yes':
